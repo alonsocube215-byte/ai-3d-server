@@ -9,7 +9,6 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 MESHY_API_KEY = os.environ.get("MESHY_API_KEY", "msy_UZmM70uA5Ptp8JcHH183EQ3vrQiYrMNfFIgh")
 
-# מילון תרגום מהיר למילים נפוצות כדי לא להסתמך על API חיצוני איטי
 HEB_TO_ENG = {
     "חתול": "cat",
     "כלב": "dog",
@@ -28,7 +27,6 @@ def smart_translate(text):
     words = text.split()
     translated_words = []
     for word in words:
-        # ניקוי סישוי / פסיקים בסיסיים
         clean_word = word.strip(".,!?")
         if clean_word in HEB_TO_ENG:
             translated_words.append(HEB_TO_ENG[clean_word])
@@ -36,20 +34,23 @@ def smart_translate(text):
             translated_words.append(clean_word)
     
     result = " ".join(translated_words)
-    # אם במקרה המערכת לא תרגמה כלום, נחזיר לפחות תיאור בסיסי
     return result if result.strip() else "3d model printable object"
 
-def calculate_smart_price(prompt, estimated_weight_grams=45):
+def calculate_smart_price(prompt):
+    # חישוב משקל דינמי אמיתי בהתאם לאורך הפרומפט ומורכבותו (בין 25 ל-80 גרם)
+    base_weight = 30 + (len(prompt.split()) * 5)
+    estimated_weight_grams = min(max(base_weight, 30), 90)
+    
     material_cost = estimated_weight_grams * 0.30
     
     complexity_factor = 1.0
-    complex_keywords = ['מבוך', 'פרטים', 'דרקון', 'טקסטורה', 'תמיכות', 'שרשרת', 'מובייל', 'חלקים', 'מנגנון']
+    complex_keywords = ['מבוך', 'פרטים', 'דרקון', 'טקסטורה', 'תמיכות', 'שרשרת', 'מובייל', 'חלקים', 'מנגנון', 'holding']
     
     for word in complex_keywords:
         if word in prompt.lower():
-            complexity_factor += 0.3
+            complexity_factor += 0.4
             
-    base_fee = 12.0
+    base_fee = 10.0
     total_price = (base_fee + material_cost) * complexity_factor
     return max(round(total_price), 25)
 
@@ -61,7 +62,6 @@ def generate_model():
     if not heb_prompt:
         return jsonify({"error": "No prompt provided"}), 400
 
-    # תרגום מהיר ומיידי מקומי
     eng_prompt = smart_translate(heb_prompt)
 
     headers = {"Authorization": f"Bearer {MESHY_API_KEY}"}
@@ -79,7 +79,8 @@ def generate_model():
         return jsonify({"error": "לא הצלחנו להתחיל את תהליך היצירה מול Meshy"}), 500
 
     result_url = None
-    for _ in range(60):
+    # מאריכים את הזמן ל-4 דקות מלאות כדי לתת ל-Meshy סבלנות לעבד בלי שגיאות
+    for _ in range(80):
         time.sleep(3)
         status_res = requests.get(f"https://api.meshy.ai/v2/text-to-3d/{task_id}", headers=headers)
         status_data = status_res.json()
@@ -95,7 +96,8 @@ def generate_model():
     if not result_url:
         return jsonify({"error": "זמן ההמתנה עבר, נסה שוב"}), 500
 
-    price = calculate_smart_price(heb_prompt, 50)
+    # מחיר משתנה אמיתי לפי מה שהוקלד
+    price = calculate_smart_price(heb_prompt)
 
     return jsonify({
         "status": "success",
