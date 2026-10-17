@@ -9,6 +9,20 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 MESHY_API_KEY = os.environ.get("MESHY_API_KEY", "msy_UZmM70uA5Ptp8JcHH183EQ3vrQiYrMNfFIgh")
 
+def calculate_smart_price(prompt, estimated_weight_grams=45):
+    material_cost = estimated_weight_grams * 0.30
+    
+    complexity_factor = 1.0
+    complex_keywords = ['מבוך', 'פרטים', 'דרקון', 'טקסטורה', 'תמיכות', 'שרשרת', 'מובייל', 'חלקים', 'מנגנון']
+    
+    for word in complex_keywords:
+        if word in prompt.lower():
+            complexity_factor += 0.3
+            
+    base_fee = 12.0
+    total_price = (base_fee + material_cost) * complexity_factor
+    return max(round(total_price), 25)
+
 @app.route('/generate-3d', methods=['POST'])
 def generate_3d():
     data = request.json or {}
@@ -29,14 +43,13 @@ def generate_3d():
     task_id = task_data.get("result") or task_data.get("id")
 
     if not task_id:
+        price = calculate_smart_price(prompt, 40)
         return jsonify({
             "status": "success",
             "model_url": "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models/2.0/Duck/glTF-Binary/Duck.glb",
-            "weight_grams": 45.0,
-            "price_ils": 45.0
+            "price_ils": price
         })
 
-    # בדיקת סטטוס מול Meshy
     result_url = None
     for _ in range(15):
         time.sleep(3)
@@ -49,15 +62,15 @@ def generate_3d():
         elif status_data.get("status") == "FAILED":
             break
 
-    # אם המודל לא סיים ייצור או נכשל, נציג מודל לדוגמה אמיתי שעובד בטוח
     if not result_url:
         result_url = "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models/2.0/Duck/glTF-Binary/Duck.glb"
+
+    price = calculate_smart_price(prompt, 50)
 
     return jsonify({
         "status": "success",
         "model_url": result_url,
-        "weight_grams": 55.0,
-        "price_ils": 55.0
+        "price_ils": price
     })
 
 if __name__ == '__main__':
