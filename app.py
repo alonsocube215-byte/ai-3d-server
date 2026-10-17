@@ -37,7 +37,6 @@ def smart_translate(text):
     return result if result.strip() else "3d model printable object"
 
 def calculate_smart_price(prompt):
-    # חישוב משקל דינמי אמיתי בהתאם לאורך הפרומפט ומורכבותו (בין 25 ל-80 גרם)
     base_weight = 30 + (len(prompt.split()) * 5)
     estimated_weight_grams = min(max(base_weight, 30), 90)
     
@@ -79,9 +78,9 @@ def generate_model():
         return jsonify({"error": "לא הצלחנו להתחיל את תהליך היצירה מול Meshy"}), 500
 
     result_url = None
-    # מאריכים את הזמן ל-4 דקות מלאות כדי לתת ל-Meshy סבלנות לעבד בלי שגיאות
-    for _ in range(80):
-        time.sleep(3)
+    # בדיקות מהירות כל 2 שניות (עד 12 ניסיונות = 24 שניות), כדי לא לפגוע במגבלת הזמן של Render
+    for _ in range(12):
+        time.sleep(2)
         status_res = requests.get(f"https://api.meshy.ai/v2/text-to-3d/{task_id}", headers=headers)
         status_data = status_res.json()
         
@@ -96,7 +95,6 @@ def generate_model():
     if not result_url:
         return jsonify({"error": "זמן ההמתנה עבר, נסה שוב"}), 500
 
-    # מחיר משתנה אמיתי לפי מה שהוקלד
     price = calculate_smart_price(heb_prompt)
 
     return jsonify({
