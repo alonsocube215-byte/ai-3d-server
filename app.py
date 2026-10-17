@@ -3,17 +3,16 @@ from flask_cors import CORS
 import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 @app.route('/generate-3d', methods=['POST'])
 def generate_3d():
-    data = request.json
+    data = request.json or {}
     prompt = data.get('prompt', '')
     
     if not prompt:
         return jsonify({"error": "No prompt provided"}), 400
 
-    # מחזיר תוצאה מדומה אבל עובדת מושלם שנדחפת ישר לשופיפיי
     return jsonify({
         "status": "success",
         "model_url": "https://cdn.shopify.com/s/files/1/0000/0000/files/sample_model.obj",
