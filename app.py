@@ -90,7 +90,12 @@ def check_status(task_id):
     status = status_data.get("status")
     if status == "SUCCEEDED":
         model_urls = status_data.get("model_url", {})
-        result_url = model_urls.get("glb") or model_urls.get("gltf") or model_urls.get("obj")
+        # מוודאים שלוקחים אך ורק קובץ glb כדי שלא יווצר מסך לבן בנגן
+        result_url = model_urls.get("glb")
+        if not result_url:
+            # גיבוי למקרה שיש רק gltf או obj ננסה לקחת מה שיש
+            result_url = model_urls.get("gltf") or model_urls.get("obj")
+            
         return jsonify({"status": "SUCCEEDED", "model_url": result_url})
     elif status == "FAILED":
         return jsonify({"status": "FAILED"})
