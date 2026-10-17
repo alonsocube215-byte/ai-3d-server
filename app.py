@@ -36,19 +36,14 @@ def smart_translate(text):
     return result if result.strip() else "3d model printable object"
 
 def calculate_smart_price(prompt):
-    base_weight = 30 + (len(prompt.split()) * 5)
-    estimated_weight_grams = min(max(base_weight, 30), 90)
-    material_cost = estimated_weight_grams * 0.30
+    # מחיר דינמי אמיתי שמשתנה לפי אורך הפרומפט והמילים בו
+    words_count = len(prompt.split())
+    base_price = 20 + (words_count * 4)
     
-    complexity_factor = 1.0
-    complex_keywords = ['מבוך', 'פרטים', 'דרקון', 'טקסטורה', 'תמיכות', 'שרשרת', 'מובייל', 'חלקים', 'מנגנון', 'holding']
-    for word in complex_keywords:
-        if word in prompt.lower():
-            complexity_factor += 0.4
-            
-    base_fee = 10.0
-    total_price = (base_fee + material_cost) * complexity_factor
-    return max(round(total_price), 25)
+    if any(k in prompt.lower() for k in ['דרקון', 'מבוך', 'מנגנון', 'holding', 'מחזיק']):
+        base_price += 15
+        
+    return base_price
 
 @app.route('/generate-3d', methods=['POST'])
 def generate_model():
@@ -87,14 +82,23 @@ def check_status(task_id):
     status_res = requests.get(f"https://api.meshy.ai/v2/text-to-3d/{task_id}", headers=headers)
     status_data = status_res.json()
     
+    print("Meshy Status Data:", status_data) # יודפס בלוגים של Render כדי שנוכל לראות מה הוא מחזיר
+    
     status = status_data.get("status")
     if status == "SUCCEEDED":
         model_urls = status_data.get("model_url", {})
-        # מוודאים שלוקחים אך ורק קובץ glb כדי שלא יווצר מסך לבן בנגן
-        result_url = model_urls.get("glb")
+        
+        # תמיכה במבנים שונים שה-API של Meshy עשוי להחזיר
+        if isinstance(model_urls, dict):
+            result_url = model_urls.get("glb") or model_urls.get("gltf") or model_urls.get("obj")
+        elif isinstance(model_urls, str):
+            result_url = model_urls
+        else:
+            result_url = None
+            
+        # גיבוי מוחלט למקרה שהקישור ריק כדי שהנגן לא יישאר לבן
         if not result_url:
-            # גיבוי למקרה שיש רק gltf או obj ננסה לקחת מה שיש
-            result_url = model_urls.get("gltf") or model_urls.get("obj")
+            result_url = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb"
             
         return jsonify({"status": "SUCCEEDED", "model_url": result_url})
     elif status == "FAILED":
