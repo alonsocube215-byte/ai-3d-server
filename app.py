@@ -24,7 +24,11 @@ def calculate_smart_price(prompt, estimated_weight_grams=45):
     return max(round(total_price), 25)
 
 @app.route('/generate-3d', methods=['POST'])
-def generate_3d():
+def generate-3d():
+    pass # placeholder to keep clean
+
+@app.route('/generate-3d', methods=['POST'])
+def generate_model():
     data = request.json or {}
     prompt = data.get('prompt', '')
     
@@ -42,18 +46,10 @@ def generate_3d():
     task_data = response.json()
     task_id = task_data.get("result") or task_data.get("id")
 
-    # גיבוי חכם במקרה שהשרת של Meshy עמוס
-    fallback_url = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb"
-
     if not task_id:
-        price = calculate_smart_price(prompt, 40)
-        return jsonify({
-            "status": "success",
-            "model_url": fallback_url,
-            "price_ils": price
-        })
+        return jsonify({"error": "לא הצלחנו להתחיל את תהליך היצירה מול Meshy", "details": task_data}), 500
 
-    # בדיקת סטטוס מול Meshy עד 3 דקות (60 ניסיונות של 3 שניות)
+    # ממתינים עד 3 דקות בסבלנות מלאה לתוצאה האמיתית של מה שכתבת
     result_url = None
     for _ in range(60):
         time.sleep(3)
@@ -66,11 +62,10 @@ def generate_3d():
             result_url = model_urls.get("glb") or model_urls.get("gltf") or model_urls.get("obj")
             break
         elif status == "FAILED":
-            break
+            return jsonify({"error": "היצירה נכשלה בשרת של Meshy"}), 500
 
-    # אם לקח יותר מדי זמן או נכשל, מחזירים תוצאה מוצלחת מראש בלי להציג שגיאה ללקוח
     if not result_url:
-        result_url = fallback_url
+        return jsonify({"error": "זמן ההמתנה עבר, נסה שוב"}), 500
 
     price = calculate_smart_price(prompt, 50)
 
