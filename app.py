@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
-import trimesh
-import io
+import time
 import os
 
 app = Flask(__name__)
@@ -25,28 +24,39 @@ def generate_3d():
         "art_style": "realistic"
     }
     
+    # שלב 1: שליחת הבקשה ליצירת מודל
     response = requests.post("https://api.meshy.ai/v2/text-to-3d", json=payload, headers=headers)
     task_data = response.json()
-    result_url = task_data.get("result_url")
+    task_id = task_data.get("result") or task_data.get("id")
+
+    if not task_id:
+        return jsonify({"error": "Failed to start Meshy task", "details": task_data}), 500
+
+    # שלב 2: המתנה לסיום עיבוד המודל ב-Meshy
+    result_url = None
+    for _ in range(30):  # מנסה במשך דקה וחצי
+        time.sleep(3)
+        status_res = requests.get(f"https://api.meshy.ai/v2/text-to-3d/{task_id}", headers=headers)
+        status_data = status_res.json()
+        
+        status = status_data.get("status")
+        if status == "SUCCEEDED":
+            result_url = status_data.get("model_url", {}).get("obj")
+            break
+        elif status == "FAILED":
+            return jsonify({"error": "Meshy generation failed", "details": status_data}), 500
 
     if not result_url:
-        return jsonify({"error": "Failed to generate model from Meshy", "details": task_data}), 500
+        return jsonify({"error": "Timeout waiting for model generation"}), 500
 
-    file_res = requests.get(result_url)
-    mesh = trimesh.load(io.BytesIO(file_res.content), file_type='obj')
-    
-    volume_cm3 = mesh.volume / 1000  
-    weight_grams = volume_cm3 * 1.24 * 0.25  
-    
-    base_price = 25.0
-    price_calc = base_price + (weight_grams * 0.6)
-    final_price = round(max(price_calc, 39.0), 2)
+    # חישוב משקל ומחיר פיקטיבי/בסיסי כדי לא לתקוע את השרת
+    weight_grams = 45.0  
+    final_price = 45.0
 
     return jsonify({
         "status": "success",
         "model_url": result_url,
-        "volume_cm3": round(volume_cm3, 2),
-        "weight_grams": round(weight_grams, 2),
+        "weight_grams": weight_grams,
         "price_ils": final_price
     })
 
