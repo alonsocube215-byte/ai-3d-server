@@ -43,30 +43,25 @@ def generate_3d():
     task_id = task_data.get("result") or task_data.get("id")
 
     if not task_id:
-        price = calculate_smart_price(prompt, 40)
-        return jsonify({
-            "status": "success",
-            "model_url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb",
-            "price_ils": price
-        })
+        return jsonify({"error": "Failed to start Meshy task", "details": task_data}), 500
 
+    # נותנים לו עד 2 דקות להשלים את הייצור של המודל האמיתי
     result_url = None
-    for _ in range(20):
+    for _ in range(40):
         time.sleep(3)
         status_res = requests.get(f"https://api.meshy.ai/v2/text-to-3d/{task_id}", headers=headers)
         status_data = status_res.json()
         
         status = status_data.get("status")
         if status == "SUCCEEDED":
-            # Meshy לפעמים מחזיר obj ולפעמים glb/gltf. ננסה למצוא את מה שהנגן אוהב
             model_urls = status_data.get("model_url", {})
             result_url = model_urls.get("glb") or model_urls.get("gltf") or model_urls.get("obj")
             break
         elif status == "FAILED":
-            break
+            return jsonify({"error": "Meshy generation failed", "details": status_data}), 500
 
     if not result_url:
-        result_url = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
+        return jsonify({"error": "Generation timed out"}), 500
 
     price = calculate_smart_price(prompt, 50)
 
