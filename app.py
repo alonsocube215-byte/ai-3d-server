@@ -46,24 +46,27 @@ def generate_3d():
         price = calculate_smart_price(prompt, 40)
         return jsonify({
             "status": "success",
-            "model_url": "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models/2.0/Duck/glTF-Binary/Duck.glb",
+            "model_url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb",
             "price_ils": price
         })
 
     result_url = None
-    for _ in range(15):
+    for _ in range(20):
         time.sleep(3)
         status_res = requests.get(f"https://api.meshy.ai/v2/text-to-3d/{task_id}", headers=headers)
         status_data = status_res.json()
         
-        if status_data.get("status") == "SUCCEEDED":
-            result_url = status_data.get("model_url", {}).get("obj")
+        status = status_data.get("status")
+        if status == "SUCCEEDED":
+            # Meshy לפעמים מחזיר obj ולפעמים glb/gltf. ננסה למצוא את מה שהנגן אוהב
+            model_urls = status_data.get("model_url", {})
+            result_url = model_urls.get("glb") or model_urls.get("gltf") or model_urls.get("obj")
             break
-        elif status_data.get("status") == "FAILED":
+        elif status == "FAILED":
             break
 
     if not result_url:
-        result_url = "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models/2.0/Duck/glTF-Binary/Duck.glb"
+        result_url = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb"
 
     price = calculate_smart_price(prompt, 50)
 
