@@ -9,6 +9,15 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 MESHY_API_KEY = os.environ.get("MESHY_API_KEY", "msy_UZmM70uA5Ptp8JcHH183EQ3vrQiYrMNfFIgh")
 
+def translate_to_english(text):
+    try:
+        url = f"https://api.mymemory.translated.net/get?q={requests.utils.quote(text)}&langpair=he|en"
+        res = requests.get(url).json()
+        translated = res.get("responseData", {}).get("translatedText")
+        return translated if translated else text
+    except:
+        return text
+
 def calculate_smart_price(prompt, estimated_weight_grams=45):
     material_cost = estimated_weight_grams * 0.30
     
@@ -24,21 +33,20 @@ def calculate_smart_price(prompt, estimated_weight_grams=45):
     return max(round(total_price), 25)
 
 @app.route('/generate-3d', methods=['POST'])
-def generate-3d():
-    pass # placeholder to keep clean
-
-@app.route('/generate-3d', methods=['POST'])
 def generate_model():
     data = request.json or {}
-    prompt = data.get('prompt', '')
+    heb_prompt = data.get('prompt', '')
     
-    if not prompt:
+    if not heb_prompt:
         return jsonify({"error": "No prompt provided"}), 400
+
+    # תרגום אוטומטי לאנגלית כדי ש-Meshy יבין בדיוק מה כתבת
+    eng_prompt = translate_to_english(heb_prompt)
 
     headers = {"Authorization": f"Bearer {MESHY_API_KEY}"}
     payload = {
         "mode": "preview",
-        "prompt": prompt,
+        "prompt": f"A detailed 3D model of {eng_prompt}, high quality, printable 3d object",
         "art_style": "realistic"
     }
     
@@ -47,9 +55,8 @@ def generate_model():
     task_id = task_data.get("result") or task_data.get("id")
 
     if not task_id:
-        return jsonify({"error": "לא הצלחנו להתחיל את תהליך היצירה מול Meshy", "details": task_data}), 500
+        return jsonify({"error": "לא הצלחנו להתחיל את תהליך היצירה מול Meshy"}), 500
 
-    # ממתינים עד 3 דקות בסבלנות מלאה לתוצאה האמיתית של מה שכתבת
     result_url = None
     for _ in range(60):
         time.sleep(3)
@@ -67,7 +74,7 @@ def generate_model():
     if not result_url:
         return jsonify({"error": "זמן ההמתנה עבר, נסה שוב"}), 500
 
-    price = calculate_smart_price(prompt, 50)
+    price = calculate_smart_price(heb_prompt, 50)
 
     return jsonify({
         "status": "success",
