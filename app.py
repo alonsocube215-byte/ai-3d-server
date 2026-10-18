@@ -3,10 +3,9 @@ from flask_cors import CORS
 from datetime import datetime
 import json
 import os
-import requests
 
 app = Flask(__name__)
-CORS(app)  # מאפשר חיבור בטוח מכל הדומיינים (CORS)
+CORS(app)
 
 DB_FILE = 'customer_quotas.json'
 
@@ -29,11 +28,20 @@ def generate_model():
     customer_id = data.get('customer_id')
     prompt = data.get('prompt')
 
+    # בדיקה אם המשתמש לא מחובר לחשבון
     if not customer_id:
-        return jsonify({'success': False, 'message': 'חובה להתחבר לחשבון כדי ליצור מודל'}), 401
+        return jsonify({
+            'success': False,
+            'is_logged_in': False,
+            'message': 'כדי ליצור מודלים ב-AI בחינם (עד 3 בחודש) יש להתחבר לחשבון או להירשם.'
+        }), 401
 
     if not prompt:
-        return jsonify({'success': False, 'message': 'נא להזין תיאור למודל'}), 400
+        return jsonify({
+            'success': False,
+            'is_logged_in': True,
+            'message': 'נא להזין תיאור למודל.'
+        }), 400
 
     quotas = load_quotas()
     current_month = datetime.now().strftime('%Y-%m')
@@ -52,12 +60,12 @@ def generate_model():
     if user_data['count'] >= 3:
         return jsonify({
             'success': False,
+            'is_logged_in': True,
             'message': 'הגעת למכסה החודשית של 3 מודלים בחינם! המכסה תתאפס בתחילת החודש הבא.',
             'remaining': 0
         }), 403
 
-    # כאן מתבצעת הפנייה ל-API של יצירת ה-3D
-    # stl_url = call_3d_ai_api(prompt)
+    # פנייה ל-API של ה-AI ליצירת ה-3D
     stl_url = "https://example.com/generated_model.stl"
 
     # עדכון המונה ושמירה
@@ -69,6 +77,7 @@ def generate_model():
 
     return jsonify({
         'success': True,
+        'is_logged_in': True,
         'stl_url': stl_url,
         'used_this_month': user_data['count'],
         'remaining_this_month': remaining,
